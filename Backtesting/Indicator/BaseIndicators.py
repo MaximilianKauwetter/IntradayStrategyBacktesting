@@ -1,6 +1,7 @@
 from abc import ABC, abstractmethod
 from datetime import datetime
 from enum import Enum
+from typing import Dict
 
 from Backtesting.DataFile import DataFile
 
@@ -12,6 +13,9 @@ class Indication(Enum):
 
 
 class BaseIndicator(ABC):
+    def __init__(self):
+        self.cache: dict[datetime, any] = dict()
+
     @abstractmethod
     def indication(self, security: DataFile, end_date: datetime) -> Indication:
         raise NotImplementedError

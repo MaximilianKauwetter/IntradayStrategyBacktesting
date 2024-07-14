@@ -49,6 +49,10 @@ class DataFile:
         plt.show()
 
     @staticmethod
+    def from_cloud() -> "DataFile":
+        return DataFile(pd.DataFrame())
+
+    @staticmethod
     def from_csv(ticker: str, start_date: date = None, end_date: date = None) -> "DataFile":
         if start_date is None:
             start_date = DataFile.EARLIEST_DATE

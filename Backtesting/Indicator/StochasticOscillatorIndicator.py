@@ -9,12 +9,12 @@ from ..DataFile import DataFile
 
 class StochasticOscillatorIndicator(MomentumIndicator):
     def __init__(self, period_ticks: int, lower_threshold=20, upper_threshold=80):
+        super().__init__()
         self.period_ticks = period_ticks
         if lower_threshold < 0 or upper_threshold < lower_threshold or 100 < upper_threshold:
             raise ValueError()
         self.lower_threshold = lower_threshold
         self.upper_threshold = upper_threshold
-        self.cache = {}
 
     def indication(self, security: DataFile, end_date: datetime) -> Indication:
         end_index = security.index.get_loc(end_date) + 1
@@ -35,9 +35,9 @@ class StochasticOscillatorIndicator(MomentumIndicator):
             return Indication.HOLD
 
     def plot_soi(self):
-        sois = pd.Series(self.cache).sort_index()
+        soi = pd.Series(self.cache).sort_index()
         plt.figure(figsize=(15, 6))
-        plt.plot(sois, label="soi", color="red")
+        plt.plot(soi, label="soi", color="red")
         plt.legend(loc="center left", bbox_to_anchor=(1, 0.5))
         plt.ylabel("soi")
         plt.show()

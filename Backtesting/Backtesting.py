@@ -8,8 +8,16 @@ from Backtesting.DataFile import DataFile
 from Backtesting.Strategies import BaseStrategy
 
 
+class Temp:
+    def __init__(self):
+        self.count = 0
+
+    def inc(self):
+        self.count += 1
+
+
 class Backtesting:
-    def __init__(self, security: DataFile, strategy: BaseStrategy, initial_investment: float = 100, start_at: datetime | int = 0):
+    def __init__(self, security: DataFile, strategy: BaseStrategy, initial_investment: float = 100, start_at: datetime | int = 0, threads: int = 1):
         self.security: DataFile = security
         self.strategy: BaseStrategy = strategy
         self.initial_investment: float = initial_investment
@@ -19,6 +27,7 @@ class Backtesting:
             self.start_at: datetime = start_at
         else:
             raise ValueError("start_at must be an integer or datetime object")
+        self.threads = threads
         self._weights = None
         self._performance_rel = None
         self._performance = None
@@ -27,19 +36,22 @@ class Backtesting:
     def weights(self) -> pd.Series:
         if self._weights is None:
             start_time = datetime.now()
-            print(f"Start backtesting at <{start_time}>")
-            self._weights = pd.Series(index=self.security.index)
-            total_num = len(self._weights)
-            # print(f"Number dates: {total_num}")
+            print(f"Start Backtesting at <{start_time}>")
+            total_num = len(self.security.index)
+            print(f"Evaluate {total_num:,} ticks")
+            weights: [datetime, None | float] = {}
+            print(f"Start Calculation at <{datetime.now()}>")
             for i, dt in enumerate(self.security.index.to_list()):
-                if i % 10 == 0:
+                weights[dt] = self.strategy.get_weight(self.security, dt)
+                if i % 100 == 0:
                     sys.stdout.write("\r")
-                    print(f"Eval {dt} ({i}[{100*(i/total_num):.2f}%])", end="")
-                self._weights.loc[dt] = self.strategy.get_weight(security=self.security, end_date=dt)
+                    print(f"Calculating [{100 * (i / total_num):.2f}%][{datetime.now() - start_time}])", end="")
+            print(f"Finished calculation in {datetime.now() - start_time}")
+            self._weights = pd.Series(data=weights).sort_index()
             self._weights.ffill(axis="index", inplace=True)
             self._weights.fillna(0, inplace=True)
             end_time = datetime.now()
-            print(f"\nFinished backtesting at <{end_time}>")
+            print(f"Finished backtesting at <{end_time}>")
             print(f"Calculation duration: <{end_time - start_time}>")
         return self._weights
 
@@ -79,3 +91,6 @@ class Backtesting:
         plt.legend(loc="center left", bbox_to_anchor=(1, 0.5))
         plt.ylabel("performance")
         plt.show()
+
+    def to_csv(self):
+        pass
