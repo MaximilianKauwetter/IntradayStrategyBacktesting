@@ -1,3 +1,5 @@
 .env
 .idea
 Data
+keys
+/google_cloud_authentication.json

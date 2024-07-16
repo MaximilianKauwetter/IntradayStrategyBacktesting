@@ -11,41 +11,67 @@ from dateutil.relativedelta import relativedelta
 
 
 class DataDownloader:
-    RAW_DATA_FOLDER = f"{os.path.dirname(__file__)}/../Data/RawCSVs"
     FILE_FORMAT = "!IIIff"
     DATE_FORMAT = "%Y/%m/%d"
     DATE_FILE_FORMAT = "%Y_%m_%d"
     SEPARATOR: str = ";"
 
     @staticmethod
-    def download_data(ticker: str, start_date: date, end_date: date) -> [pd.DataFrame, pd.DataFrame]:
-        raw_dir_path = f"{DataDownloader.RAW_DATA_FOLDER}/{ticker}"
-        if not os.path.isdir(raw_dir_path):
-            os.makedirs(raw_dir_path)
-        all_days = pd.date_range(start_date, end_date, freq="1d", inclusive="both").to_list()
-        dfs = []
-        print(f"Downloading data for {ticker}")
-        number_days = len(all_days)
-        for j, day in enumerate(all_days):
-            sys.stdout.write("\r")
-            print(day, end="")
-            day_df_file = f"{DataDownloader.RAW_DATA_FOLDER}/{ticker}/{ticker}_{day.strftime(DataDownloader.DATE_FILE_FORMAT)}.csv"
-            if os.path.exists(day_df_file):
-                print(" in filesystem", end="")
-                day_df = pd.read_csv(filepath_or_buffer=day_df_file, sep=DataDownloader.SEPARATOR, parse_dates=["date"], index_col="date")
-            else:
-                print(" download", end="")
-                day_df = pd.concat([DataDownloader.download_df(ticker, day + relativedelta(hour=i), perc=100 * (24 * j + i) / (24 * number_days)) for i in range(24)], axis="index")
-                day_df.to_csv(path_or_buf=day_df_file, index=True, sep=DataDownloader.SEPARATOR)
-            dfs.append(day_df)
-        print("\nDownload done\nStart Calculations")
-        df = pd.concat(dfs, axis="index")
-        # calc new columns
+    def calc_columns(df: pd.DataFrame) -> pd.DataFrame:
+        start_time = datetime.now()
+        print(f"Start calculating columns at <{start_time}>")
         for_ret_calc = df.dropna(how="any", axis="rows").copy()
         for_ret_calc["returns"] = for_ret_calc["bid"].pct_change()
         for_ret_calc["sell_costs"] = -for_ret_calc["spread"] / for_ret_calc["ask"]
         df = df.join(for_ret_calc.loc[:, ["returns", "sell_costs"]], how="left")
+        end_time = datetime.now()
+        print(f"End calculating columns at <{end_time}> within <{end_time - start_time}>")
         return df
+
+    @staticmethod
+    def download_data(ticker: str, start_date: date, end_date: date) -> pd.DataFrame:
+        all_days = pd.date_range(start_date, end_date, freq="1d", inclusive="both").to_list()
+        dfs = []
+        number_days = len(all_days)
+        print(f"Downloading data for {ticker}")
+        for day_nr, day in enumerate(all_days):
+            sys.stdout.write("\r")
+            print(day, end="")
+            day_df = DataDownloader.download_day(ticker=ticker, day=day, day_nr=day_nr, total_days=number_days)
+            dfs.append(day_df)
+        print("\nDownload done\nStart Calculations")
+        df = pd.concat(dfs, axis="index")
+        return DataDownloader.calc_columns(df)
+
+    @staticmethod
+    def update_data(df: pd.DataFrame, ticker: str, start_date: date, end_date: date) -> pd.DataFrame:
+        df = df.loc[:, ["ask", "bid", "ask_vol", "bid_vol", "mid", "spread"]]
+        df_first_day = df.index[0].date()
+        df_last_day = df.index[-1].date()
+        days_before = pd.date_range(start_date, df_first_day, freq="1d", inclusive="left").to_list() if start_date != df_first_day else []
+        days_after = pd.date_range(df_last_day, end_date, freq="1d", inclusive="right").to_list() if end_date != df_last_day else []
+        number_days = len(days_before) + len(days_after)
+
+        start_time = datetime.now()
+        dfs = []
+        print(f"Downloading additional data for {ticker} at <{start_time}>")
+        for day_nr, day in enumerate(days_before):
+            sys.stdout.write("\r")
+            print(day, end="")
+            dfs.append(DataDownloader.download_day(ticker=ticker, day=day, day_nr=day_nr, total_days=number_days))
+        dfs.append(df)
+        for day_nr, day in enumerate(days_after):
+            sys.stdout.write("\r")
+            print(day, end="")
+            dfs.append(DataDownloader.download_day(ticker=ticker, day=day, day_nr=len(days_before) + day_nr, total_days=number_days))
+        end_time = datetime.now()
+        print(f"\nDownload done at <{end_time}> Time needed <{end_time-start_time}>")
+        df = pd.concat(dfs, axis="index")
+        return DataDownloader.calc_columns(df)
+
+    @staticmethod
+    def download_day(ticker: str, day: datetime, day_nr: int, total_days: int) -> pd.DataFrame:
+        return pd.concat([DataDownloader.download_df(ticker, day + relativedelta(hour=i), perc=100 * (24 * day_nr + i) / (24 * total_days)) for i in range(24)], axis="index")
 
     @staticmethod
     def download_df(ticker: str, timestamp: datetime, perc: None | float = None) -> pd.DataFrame:
