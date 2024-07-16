@@ -11,13 +11,20 @@ from Backtesting.DataFile import DataFile
 from google.cloud import storage
 
 if __name__ == "__main__":
-    print("Done")
-
-    exit()
-
     print("start")
-    client = storage.Client.from_service_account_json("testdatascience-429415-35fe432be01f.json")
+    print(f"Ticker: {os.getenv('TICKER','No ticker specified')}")
+    print(f"Strategy: {os.getenv('STRATEGY','No Strategy specified')}")
+    if os.path.exists("google_cloud_authentication.json"):
+        client = storage.Client.from_service_account_json("google_cloud_authentication.json")
+    else:
+        try:
+            client = storage.Client()
+        except Exception as _:
+            print("No google_cloud_authentication.json could be found and automatic authentication is also not possible")
+            exit()
     bucket = client.get_bucket("mkauwetter-datascience-bucket")
+    print("Bloobs:", bucket.list_blobs())
+    exit()
 
     pd.set_option("display.expand_frame_repr", False)
     start_date = date(year=2024, month=2, day=1)
