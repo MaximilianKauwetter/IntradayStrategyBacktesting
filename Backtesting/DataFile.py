@@ -1,3 +1,4 @@
+import io
 import os
 from datetime import date, datetime
 
@@ -6,6 +7,7 @@ import pandas as pd
 from dateutil.relativedelta import relativedelta
 
 from DataDownload.DataDownloader import DataDownloader
+from google.cloud import storage
 
 
 class DataFile:
@@ -49,8 +51,45 @@ class DataFile:
         plt.show()
 
     @staticmethod
-    def from_cloud() -> "DataFile":
-        return DataFile(pd.DataFrame())
+    def upload_to_cloud(blob: storage.Blob, df: pd.DataFrame) -> None:
+        start_time = datetime.now()
+        print(f"Start upload at <{start_time}>")
+        blob.upload_from_string(df.to_csv(index=True, sep=DataDownloader.SEPARATOR), "text/csv")
+        end_time = datetime.now()
+        print(f"End upload at <{end_time}> within <{end_time-start_time}>")
+
+    @staticmethod
+    def from_cloud(bucket: storage.Bucket, ticker: str, start_date: date = None, end_date: date = None) -> "DataFile":
+        if start_date is None:
+            start_date = DataFile.EARLIEST_DATE
+        latest_full_date = date.today() - relativedelta(days=1)
+        if end_date is None or latest_full_date < end_date:
+            end_date = latest_full_date
+
+        blob = bucket.blob(f"Data/{ticker}.csv")
+        if blob.exists():
+            df_ts = pd.read_csv(
+                io.BytesIO(blob.download_as_bytes()),
+                sep=DataDownloader.SEPARATOR,
+                parse_dates=["date"],
+                index_col="date",
+            )
+            dates = df_ts.index
+            first_date, last_date = dates[0].date(), dates[-1].date()
+            if start_date < first_date or last_date < end_date:
+                # build new bigger AggregateDF and store
+                print("Update AGGREGATE")
+                first_date = min(first_date, start_date)
+                last_date = max(last_date, end_date)
+                df_ts = DataDownloader.update_data(df=df_ts, ticker=ticker, start_date=first_date, end_date=last_date)
+                DataFile.upload_to_cloud(blob=blob, df=df_ts)
+            start_date, end_date = pd.to_datetime((start_date, end_date + relativedelta(days=1, microseconds=-1)))
+            df_ts = df_ts.loc[(start_date <= df_ts.index) & (df_ts.index <= end_date)]
+        else:
+            df_ts = DataDownloader.download_data(ticker=ticker, start_date=start_date, end_date=end_date)
+            DataFile.upload_to_cloud(blob=blob, df=df_ts)
+        df_ts.dropna(how="any", axis="rows", inplace=True)
+        return DataFile(df_ts)
 
     @staticmethod
     def from_csv(ticker: str, start_date: date = None, end_date: date = None) -> "DataFile":
@@ -70,13 +109,12 @@ class DataFile:
             )
             dates = df_ts.index
             first_date, last_date = dates[0].date(), dates[-1].date()
-
             if start_date < first_date or last_date < end_date:
                 # build new bigger AggregateDF and store
                 print("Update AGGREGATE")
                 first_date = min(first_date, start_date)
                 last_date = max(last_date, end_date)
-                df_ts = DataDownloader.download_data(ticker=ticker, start_date=first_date, end_date=last_date)
+                df_ts = DataDownloader.update_data(df_ts, ticker=ticker, start_date=first_date, end_date=last_date)
                 df_ts.to_csv(path_or_buf=file_path_ts, index=True, sep=DataDownloader.SEPARATOR)
             start_date, end_date = pd.to_datetime((start_date, end_date + relativedelta(days=1, microseconds=-1)))
             df_ts = df_ts.loc[(start_date <= df_ts.index) & (df_ts.index <= end_date)]
@@ -84,4 +122,5 @@ class DataFile:
             print("write to AGGREGATE")
             df_ts = DataDownloader.download_data(ticker=ticker, start_date=start_date, end_date=end_date)
             df_ts.to_csv(path_or_buf=file_path_ts, index=True, sep=DataDownloader.SEPARATOR)
+        df_ts.dropna(how="any", axis="rows", inplace=True)
         return DataFile(df_ts)

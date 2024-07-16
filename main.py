@@ -1,22 +1,34 @@
+import io
+import os
 import sys
 from datetime import date, datetime
 import time
 
 import numpy as np
 import pandas as pd
-from matplotlib import pyplot as plt
 
 from Backtesting.DataFile import DataFile
-from Backtesting.Backtesting import Backtesting
-from Backtesting.Strategies import UpperLowerStrategy, Strategy1, Strategy2
-
+from google.cloud import storage
 
 if __name__ == "__main__":
+    print("Done")
+
+    exit()
+
+    print("start")
+    client = storage.Client.from_service_account_json("testdatascience-429415-35fe432be01f.json")
+    bucket = client.get_bucket("mkauwetter-datascience-bucket")
+
     pd.set_option("display.expand_frame_repr", False)
-    start_date = date(year=2024, month=1, day=10)
-    end_date = date(year=2024, month=1, day=10)
+    start_date = date(year=2024, month=2, day=1)
+    end_date = date(year=2024, month=2, day=29)
     ticker = "BTCEUR"
-    data = DataFile.from_csv(ticker=ticker, start_date=start_date, end_date=end_date)
+    data = DataFile.from_cloud(bucket=bucket, ticker=ticker, start_date=start_date, end_date=end_date)
+
+    print(data._df)
+
+    exit()
+
     strat = Strategy2()
     backtesting = Backtesting(security=data, strategy=strat, start_at=10000, threads=64)
     backtesting.performance

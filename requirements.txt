@@ -3,3 +3,4 @@ pandas
 matplotlib
 python-dateutil
 requests
+google-cloud-storage
