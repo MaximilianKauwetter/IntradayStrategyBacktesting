@@ -1,9 +1,8 @@
 from abc import ABC, abstractmethod
 from datetime import datetime
 from enum import Enum
-from typing import Dict
 
-from Backtesting.DataFile import DataFile
+from DataDownload.DataFile import DataFile
 
 
 class Indication(Enum):

@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from Backtesting.DataFile import DataFile
+from DataDownload.DataFile import DataFile
 from . import BaseStrategy
 
 

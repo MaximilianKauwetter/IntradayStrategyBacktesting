@@ -1,7 +1,7 @@
 from abc import ABC, abstractmethod
 from datetime import datetime
 
-from Backtesting.DataFile import DataFile
+from DataDownload.DataFile import DataFile
 
 
 class BaseStrategy(ABC):
