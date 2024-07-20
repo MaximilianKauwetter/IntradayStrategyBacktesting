@@ -90,6 +90,7 @@ class DataDownloader:
 
     @staticmethod
     def download_df(ticker: str, timestamp: datetime) -> pd.DataFrame:
+        # Developed by Maximilian Kauwetter
         url = f"https://datafeed.dukascopy.com/datafeed/{ticker}/{timestamp.year}/{timestamp.month - 1:02d}/{timestamp.day:02d}/{timestamp.hour:02d}h_ticks.bi5"
         df = DataDownloader.download_bi5_to_df(url)
         df["date"] = df["date"].apply(lambda milsec: timestamp + relativedelta(microseconds=milsec * 1000))

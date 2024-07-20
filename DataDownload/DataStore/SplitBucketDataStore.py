@@ -8,8 +8,8 @@ import numpy as np
 import pandas as pd
 import psutil
 from google.cloud import storage
-from matplotlib import ticker
 
+from Backtesting.AggBacktestResult import AggBacktestResult
 from Backtesting.BacktestResult import BacktestResult
 from . import BaseDataStore
 from ..DataDownloader import DataDownloader
@@ -17,6 +17,7 @@ from ..DataDownloader import DataDownloader
 
 class SplitBucketDataStore(BaseDataStore):
     AUTHENTICATOR_FILE_PATH: str = f"{os.path.dirname(__file__)}/../../google_cloud_authentication.json"
+    # Developed by Maximilian Kauwetter
 
     def __init__(self, ticker: str, num_threads: int = 1):
         super().__init__(ticker, num_threads)
@@ -51,6 +52,7 @@ class SplitBucketDataStore(BaseDataStore):
         start_time = datetime.now()
         print(f"Start blob download at <{start_time}>")
         blob_names = [blob.name for blob in self.bucket.list_blobs(prefix=f"Data/{self.ticker}/")]
+        print(blob_names)
         total_todo = len(blob_names)
         final: dict = dict.fromkeys(blob_names, None)
         threads = []
@@ -104,30 +106,52 @@ class SplitBucketDataStore(BaseDataStore):
         end_time = datetime.now()
         print(f"End blob upload at <{end_time}> within <{end_time - start_time}>")
 
-    def download_backtest(self, start_date: date, end_date: date, strategy_name: str) -> pd.DataFrame:
+    def download_backtest(self, start_date: date, end_date: date, strategy_name: str, from_ts: bool = True) -> dict[str, pd.DataFrame]:
         name = f"{self.ticker}-{start_date.strftime(DataDownloader.DATE_FILE_FORMAT)}-{end_date.strftime(DataDownloader.DATE_FILE_FORMAT)}-{strategy_name}"
-        backtest_ts_blob = self.bucket.blob(f"Backtest/{name}|ts.csv")
-        if not backtest_ts_blob.exists():
-            raise FileNotFoundError(f"{name} do not exist")
+        backtest_folder = f"Backtests/{name}/"
+        if len(list(self.bucket.list_blobs(prefix=backtest_folder))) == 0:
+            print(f"{name} does not exist")
+            return {}
         start_time = datetime.now()
         print(f"Start backtest blobs download at <{start_time}>")
-        df_ts = pd.read_csv(
-            io.BytesIO(backtest_ts_blob.download_as_bytes()),
-            sep=DataDownloader.SEPARATOR,
-            parse_dates=["date"],
-            index_col="date",
-        )
+        if from_ts:
+            backtest_ts_blob = self.bucket.blob(f"Backtests/{name}/ts.csv")
+            ret_dict = dict(
+                df_ts=pd.read_csv(
+                    io.BytesIO(backtest_ts_blob.download_as_bytes()),
+                    sep=DataDownloader.SEPARATOR,
+                    parse_dates=["date"],
+                    index_col="date",
+                )
+            )
+        else:
+            backtest_daily_blob = self.bucket.blob(f"Backtests/{name}/daily.csv")
+            backtest_info_blob = self.bucket.blob(f"Backtests/{name}/info.csv")
+            ret_dict = dict(
+                df_daily=pd.read_csv(
+                    io.BytesIO(backtest_daily_blob.download_as_bytes()),
+                    sep=DataDownloader.SEPARATOR,
+                    parse_dates=[0],
+                    index_col=0,
+                ),
+                df_info=pd.read_csv(
+                    io.BytesIO(backtest_info_blob.download_as_bytes()),
+                    sep=DataDownloader.SEPARATOR,
+                    index_col=0,
+                ),
+            )
+
         end_time = datetime.now()
         print(f"End backtest blob downloads at <{end_time}> within <{end_time - start_time}>")
-        return df_ts
+        return ret_dict
 
     def upload_backtest(self, backtest_result: BacktestResult) -> None:
         name = (
-            f"{self.ticker}-{backtest_result.start_date.strftime(DataDownloader.DATE_FILE_FORMAT)}-{backtest_result.end_date.strftime(DataDownloader.DATE_FILE_FORMAT)}-{backtest_result.strategy_name}"
+            f"{self.ticker}-{backtest_result.start_at.strftime(DataDownloader.DATE_FILE_FORMAT)}-{backtest_result.end_date.strftime(DataDownloader.DATE_FILE_FORMAT)}-{backtest_result.strategy_name}"
         )
-        backtest_info_blob = self.bucket.blob(f"Backtest/{name}-info.csv")
-        backtest_daily_blob = self.bucket.blob(f"Backtest/{name}-daily.csv")
-        backtest_ts_blob = self.bucket.blob(f"Backtest/{name}-ts.csv")
+        backtest_info_blob = self.bucket.blob(f"Backtests/{name}/info.csv")
+        backtest_daily_blob = self.bucket.blob(f"Backtests/{name}/daily.csv")
+        backtest_ts_blob = self.bucket.blob(f"Backtests/{name}/ts.csv")
         start_time = datetime.now()
         print(f"Start backtest blobs upload at <{start_time}>")
         backtest_info_blob.upload_from_string(backtest_result.to_info_df().to_csv(index=True, sep=DataDownloader.SEPARATOR), "text/csv", timeout=None)
@@ -135,3 +159,16 @@ class SplitBucketDataStore(BaseDataStore):
         backtest_ts_blob.upload_from_string(backtest_result.to_ts_df().to_csv(index=True, sep=DataDownloader.SEPARATOR), "text/csv", timeout=None)
         end_time = datetime.now()
         print(f"End backtest blob upload at <{end_time}> within <{end_time - start_time}>")
+
+    def upload_agg_backtest(self, agg_backtest_result: AggBacktestResult, with_plot: bool = True) -> None:
+        start_time = datetime.now()
+        print(f"Start AGG Backtest upload at <{start_time}>")
+        folder = f"AggBacktests/{agg_backtest_result.ticker}_{agg_backtest_result.strat_names}/{agg_backtest_result.first_date.strftime(DataDownloader.DATE_FILE_FORMAT)}___{agg_backtest_result.last_date.strftime(DataDownloader.DATE_FILE_FORMAT)}"
+        info_blob = self.bucket.blob(f"{folder}/info.csv")
+        info_blob.upload_from_string(agg_backtest_result.info.to_csv(index=True, sep=DataDownloader.SEPARATOR), "text/csv", timeout=None)
+        print(f"AGG Info uploaded within <{datetime.now() - start_time}>")
+        if with_plot:
+            img_blob = self.bucket.blob(f"{folder}/performance.png")
+            img_blob.upload_from_string(agg_backtest_result.plot.read(), content_type="image/png", timeout=None)
+        end_time = datetime.now()
+        print(f"End AGG Backtest upload upload at <{end_time}> within <{end_time - start_time}>")

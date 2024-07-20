@@ -5,3 +5,5 @@ python-dateutil
 requests
 google-cloud-storage
 psutil
+multiprocesspandas
+numba

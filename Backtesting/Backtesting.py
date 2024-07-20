@@ -5,13 +5,13 @@ import matplotlib.pyplot as plt
 import pandas as pd
 
 from DataDownload.DataFile import DataFile
-from Backtesting.Strategies import BaseStrategy
-from .BacktestResult import BacktestResult
+from Backtesting.Strategies.BaseStrategy import BaseStrategy
+from Backtesting.BacktestResult import BacktestResult
 from DataDownload.DataStore import BaseDataStore
 
 
 class Backtesting:
-    def __init__(self, security: DataFile, strategy: BaseStrategy, initial_investment: float = 100, start_at: datetime | int = 0, threads: int = 1):
+    def __init__(self, security: DataFile, strategy: BaseStrategy, initial_investment: float = 100, start_at: datetime | int = 0, threads: int = 1, iterative: bool = False):
         self.security: DataFile = security
         self.strategy: BaseStrategy = strategy
         self.initial_investment: float = initial_investment
@@ -22,6 +22,7 @@ class Backtesting:
         else:
             raise ValueError(f"start_at must be an integer or datetime object, but was {type(start_at)}")
         self.threads = threads
+        self.iterative = iterative
         self._weights = None
         self._performance_rel = None
         self._performance = None
@@ -31,19 +32,25 @@ class Backtesting:
     def weights(self) -> pd.Series:
         if self._weights is None:
             start_time = datetime.now()
-            print(f"Start Backtesting at <{start_time}>")
-            ticks_to_eval = self.security.index[self.start_at :].to_list()
-            total_num = len(ticks_to_eval)
-            print(f"Evaluate {total_num:,} ticks from <{ticks_to_eval[0]}> to <{ticks_to_eval[-1]}>")
-            weights: [datetime, None | float] = {}
-            print(f"Start Calculation at <{datetime.now()}>")
-            for i, dt in enumerate(ticks_to_eval):
-                weights[dt] = self.strategy.get_weight(self.security, dt)
-                if i % 100 == 0:
-                    sys.stdout.write("\r")
-                    print(f"Calculating [{100 * (i / total_num):.2f}%][{datetime.now() - start_time}])", end="")
-            print(f"Finished calculation in {datetime.now() - start_time}")
-            self._weights = pd.Series(data=weights).sort_index()
+            print(f"Start Backtesting at <{start_time}> ", end="")
+            if self.iterative:
+                print("iterative")
+                ticks_to_eval = self.security.index[self.start_at :].to_list()
+                total_num = len(ticks_to_eval)
+                print(f"Evaluate {total_num:,} ticks from <{ticks_to_eval[0]}> to <{ticks_to_eval[-1]}>")
+                weights: [datetime, None | float] = {}
+                print(f"Start Calculation at <{datetime.now()}>")
+                for i, dt in enumerate(ticks_to_eval):
+                    weights[dt] = self.strategy.get_weight(self.security, dt)
+                    if i % 1000 == 0:
+                        sys.stdout.write("\r")
+                        print(f"Calculating [{100 * (i / total_num):.2f}%][{datetime.now() - start_time}])", end="")
+                print(f"Finished calculation in {datetime.now() - start_time}")
+                self._weights = pd.Series(data=weights, dtype=float).sort_index()
+            else:
+                print("non iterative")
+                self._weights = self.strategy.get_weights(self.security).iloc[self.start_at :].astype(float)
+                self._weights.name = None
             self._weights.ffill(axis="index", inplace=True)
             self._weights.fillna(0, inplace=True)
             end_time = datetime.now()
@@ -83,6 +90,7 @@ class Backtesting:
         if self._result is None:
             self._result = BacktestResult(
                 ticker=self.security.ticker,
+                df_ts=None,
                 weights=self.weights,
                 performance_rel=self.performance_rel,
                 strategy_name=self.strategy.__class__.__name__,
