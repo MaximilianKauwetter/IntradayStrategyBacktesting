@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 import pandas as pd
 
 from DataDownload.DataFile import DataFile
-from Backtesting.Strategies.BaseStrategy import BaseStrategy
+from Backtesting.Strategy.BaseStrategy import BaseStrategy
 from Backtesting.BacktestResult import BacktestResult
 from DataDownload.DataStore import BaseDataStore
 

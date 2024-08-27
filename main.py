@@ -3,7 +3,7 @@ from datetime import datetime, date
 
 from Backtesting.AggBacktestResult import AggBacktestResult
 from Backtesting.Backtesting import Backtesting
-from Backtesting.Strategies import *
+from Backtesting.Strategy import *
 from DataDownload.DataStore import SplitBucketDataStore, LocalDataStore
 
 if __name__ == "__main__":

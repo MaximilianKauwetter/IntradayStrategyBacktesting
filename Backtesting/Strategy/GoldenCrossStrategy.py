@@ -4,7 +4,7 @@ import pandas as pd
 from dateutil.relativedelta import relativedelta
 
 from Backtesting.Indicator import SimpleMovingAverageIndicator
-from Backtesting.Strategies import BaseStrategy
+from Backtesting.Strategy import BaseStrategy
 from DataDownload.DataFile import DataFile
 
 
