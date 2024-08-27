@@ -1,5 +1,8 @@
 from .BaseIndicators import Indication, VolatilityIndicator, VolumeIndicator, MomentumIndicator, TrendIndicator
-from .StochasticOscillatorIndicator import StochasticOscillatorIndicator
-from .SimpleMovingAverageIndicator import SimpleMovingAverageIndicator
 from .BollingerBandsIndicator import BollingerBandsIndicator
+from .ExponentialMovingAverage import ExponentialMovingAverageIndicator
 from .KeltnerChannelsIndicator import KeltnerChannelsIndicator
+from .RelativeStrengthIndexIndicator import RelativeStrengthIndexIndicator
+from .SimpleAverageTrueRangeIndicator import SimpleAverageTrueRangeIndicator
+from .SimpleMovingAverageIndicator import SimpleMovingAverageIndicator
+from .StochasticOscillatorIndicator import StochasticOscillatorIndicator
